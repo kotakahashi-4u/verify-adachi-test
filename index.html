@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>足立区 食料品等物価高支援給付金チャットボット</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: #e5e7eb; /* bg-gray-200 */
+        }
+        .chat-bubble {
+            max-width: 85%; /* 幅を少し広げる */
+            border-radius: 1.2rem; /* 角丸を少し大きく */
+            padding: 0.8rem 1rem;
+            position: relative;
+            animation: fadeIn 0.3s ease-out;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            font-size: 0.95rem; /* 文字サイズ調整 */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* 軽い影 */
+        }
+        .bot-bubble {
+            background-color: #ffffff;
+            color: #1f2937;
+            border-top-left-radius: 0; /* 左上を尖らせる */
+            margin-right: auto;
+        }
+        .user-bubble {
+            background-color: #0d9488; /* teal-600 */
+            color: white;
+            border-top-right-radius: 0; /* 右上を尖らせる */
+            margin-left: auto;
+        }
+        .option-btn {
+            transition: all 0.2s;
+        }
+        .option-btn:active {
+            transform: scale(0.95);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* スクロールバーのカスタマイズ */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col max-w-md mx-auto bg-slate-50 shadow-2xl overflow-hidden border-x border-gray-300">
+
+    <!-- ヘッダー -->
+    <header class="bg-teal-700 text-white px-4 py-3 flex items-center justify-between shadow-md z-10">
+        <div class="flex items-center gap-3">
+            <div class="bg-white/10 p-1.5 rounded-full backdrop-blur-sm">
+                <i class="fa-solid fa-robot text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base tracking-wide">給付金案内ボット</h1>
+                <p class="text-[10px] text-teal-100 opacity-90">足立区 2026年 物価高支援</p>
+            </div>
+        </div>
+        <!-- リセットボタン -->
+        <button onclick="resetChat()" class="text-teal-100 hover:text-white hover:bg-white/10 p-2 rounded-full transition" title="最初から">
+            <i class="fa-solid fa-rotate-right"></i>
+        </button>
+    </header>
+
+    <!-- チャットエリア -->
+    <main id="chat-container" class="flex-1 overflow-y-auto p-3 space-y-3 bg-[#f0f2f5] relative">
+        <!-- 最初のメッセージはJSで追加されます -->
+    </main>
+
+    <!-- 入力エリア -->
+    <div class="px-3 py-3 bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+        <!-- クイック選択肢エリア (横スクロール) -->
+        <div id="options-container" class="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
+            <!-- 選択肢はJSで動的に生成 -->
+        </div>
+
+        <!-- テキスト入力 -->
+        <form id="chat-form" class="flex gap-2 items-center" onsubmit="handleUserSubmit(event)">
+            <input 
+                type="text" 
+                id="user-input" 
+                class="flex-1 bg-gray-100 border-0 text-gray-800 rounded-full px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition text-sm"
+                placeholder="質問を入力..."
+            >
+            <button 
+                type="submit" 
+                class="bg-teal-600 hover:bg-teal-700 text-white rounded-full w-10 h-10 flex items-center justify-center transition shadow-sm flex-shrink-0"
+            >
+                <i class="fa-solid fa-paper-plane text-sm"></i>
+            </button>
+        </form>
+        <p class="text-[10px] text-gray-400 text-center mt-2">
+            ※デモ用チャットボットです。詳細は<a href="https://www.city.adachi.tokyo.jp/" target="_blank" class="underline hover:text-teal-600">足立区公式サイト</a>へ。
+        </p>
+    </div>
+
+    <script>
+        // データソース (2026年1月時点の情報に基づく)
+        const botData = {
+            greetings: [
+                "こんにちは！足立区の「食料品等物価高支援給付金（1人1万円）」についてのご質問にお答えします。",
+                "知りたい内容を下のボタンから選ぶか、メッセージを入力してください。"
+            ],
+            // 選択肢定義
+            options: [
+                { label: "対象者は？", value: "target" },
+                { label: "いくら？", value: "amount" },
+                { label: "いつ？", value: "schedule" },
+                { label: "申請方法は？", value: "apply" },
+                { label: "詐欺に注意", value: "scam" },
+                { label: "問い合わせ", value: "contact" }
+            ],
+            // 回答データ
+            answers: {
+                target: {
+                    title: "対象者について",
+                    text: "【全区民】が対象です。\n所得制限はありません。\n\n令和8年1月1日時点で足立区に住民登録がある方が対象となります。"
+                },
+                amount: {
+                    title: "給付額について",
+                    text: "区民1人あたり【1万円】です。\n（例：4人家族の場合は合計4万円）\n\n現金での給付となります（おこめ券などではありません）。"
+                },
+                schedule: {
+                    title: "支給時期について",
+                    text: "対象者によって時期が異なります。\n\n1. 【振込事前案内対象（低所得世帯など）】\n令和8年2月下旬以降\n※2月上旬に案内発送予定\n\n2. 【その他の方（ATM受取）】\n令和8年3月中旬以降\n※3月上旬に案内発送予定"
+                },
+                apply: {
+                    title: "受取方法について",
+                    text: "大きく分けて2つのパターンがあります。\n\n1. 【口座振込】\n以前に3万円給付金を受け取った世帯などは、原則手続き不要で登録口座に振り込まれます。\n\n2. 【コンビニATM受取】\n上記以外の方は、郵送される案内を確認し、お近くの大手コンビニ銀行ATM等で受け取り手続きを行う予定です（詳細は3月上旬の案内をお待ちください）。"
+                },
+                scam: {
+                    title: "⚠️ 詐欺にご注意ください",
+                    text: "区役所の職員が、給付金のために以下を行うことは**絶対にありません**。\n\n❌ ご自宅を訪問する\n❌ ATMの操作をお願いする\n❌ 口座の暗証番号を聞き出す\n\n不審な電話や訪問があった場合は、警察（#9110）にご相談ください。"
+                },
+                contact: {
+                    title: "お問い合わせ",
+                    text: "詳細な質問は、足立区のコールセンターへお願いします。\n\n📞 お問い合わせコールあだち\n電話：03-3880-0039\n受付時間：午前8時〜午後8時"
+                },
+                default: {
+                    text: "申し訳ありません。その質問にはうまく答えられないかもしれません。\n下のボタンから選んでいただくか、「お問い合わせ」を選択してください。"
+                }
+            }
+        };
+
+        const chatContainer = document.getElementById('chat-container');
+        const optionsContainer = document.getElementById('options-container');
+        const userInput = document.getElementById('user-input');
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            resetChat();
+        });
+
+        function resetChat() {
+            chatContainer.innerHTML = '';
+            renderOptions();
+            
+            // 少し遅れて挨拶を表示
+            setTimeout(() => addBotMessage(botData.greetings[0]), 300);
+            setTimeout(() => addBotMessage(botData.greetings[1]), 800);
+        }
+
+        // メッセージ追加（ボット）
+        function addBotMessage(text, title = null) {
+            const div = document.createElement('div');
+            // items-end -> items-start に変更して、アイコンを上に配置
+            div.className = 'flex items-start gap-2 mb-2';
+            
+            let contentHtml = '';
+            if (title) {
+                contentHtml += `<div class="font-bold text-teal-700 mb-1.5 border-b border-gray-100 pb-1 text-sm">${title}</div>`;
+            }
+            contentHtml += text;
+
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                    <i class="fa-solid fa-robot text-teal-600 text-sm"></i>
+                </div>
+                <div class="chat-bubble bot-bubble text-sm">${contentHtml}</div>`;
+            chatContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        // メッセージ追加（ユーザー）
+        function addUserMessage(text) {
+            const div = document.createElement('div');
+            div.className = 'flex items-start gap-2 mb-4 justify-end'; // justify-endを追加
+            div.innerHTML = `<div class="chat-bubble user-bubble text-sm">${escapeHtml(text)}</div>`;
+            chatContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        // 選択肢ボタンの描画
+        function renderOptions() {
+            optionsContainer.innerHTML = '';
+            botData.options.forEach(opt => {
+                const btn = document.createElement('button');
+                // ボタンのデザインを少し調整
+                btn.className = 'option-btn bg-white border border-teal-500 text-teal-600 px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap hover:bg-teal-50 shadow-sm';
+                btn.textContent = opt.label;
+                btn.onclick = () => handleOptionClick(opt.value, opt.label);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        // 選択肢クリック時の処理
+        function handleOptionClick(key, label) {
+            addUserMessage(label);
+            showTypingIndicator();
+            
+            setTimeout(() => {
+                removeTypingIndicator();
+                const answer = botData.answers[key];
+                if (answer) {
+                    addBotMessage(answer.text, answer.title);
+                } else {
+                    addBotMessage(botData.answers.default.text);
+                }
+            }, 600);
+        }
+
+        // テキスト送信時の処理
+        function handleUserSubmit(e) {
+            e.preventDefault();
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            addUserMessage(text);
+            userInput.value = '';
+            showTypingIndicator();
+
+            setTimeout(() => {
+                removeTypingIndicator();
+                const responseKey = analyzeInput(text);
+                const answer = botData.answers[responseKey];
+                
+                if (responseKey === 'default') {
+                    addBotMessage(botData.answers.default.text);
+                } else {
+                    addBotMessage(answer.text, answer.title);
+                }
+            }, 700);
+        }
+
+        // 簡易的なキーワード分析
+        function analyzeInput(text) {
+            const t = text.toLowerCase();
+            if (t.includes('対象') || t.includes('誰') || t.includes('住民') || t.includes('所得')) return 'target';
+            if (t.includes('いくら') || t.includes('金額') || t.includes('何円')) return 'amount';
+            if (t.includes('いつ') || t.includes('時期') || t.includes('日') || t.includes('振込')) return 'schedule';
+            if (t.includes('申請') || t.includes('方法') || t.includes('手続き') || t.includes('atm')) return 'apply';
+            if (t.includes('詐欺') || t.includes('電話') || t.includes('怪しい')) return 'scam';
+            if (t.includes('電話') || t.includes('連絡') || t.includes('問い合わせ')) return 'contact';
+            
+            return 'default';
+        }
+
+        // タイピングインジケーター（...のアニメーション）
+        function showTypingIndicator() {
+            const div = document.createElement('div');
+            div.id = 'typing-indicator';
+            div.className = 'flex items-start gap-2 mb-2'; // items-end -> items-start
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                    <i class="fa-solid fa-robot text-teal-600 text-sm"></i>
+                </div>
+                <div class="chat-bubble bot-bubble">
+                    <div class="flex gap-1 h-2 items-center my-1">
+                        <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                        <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                        <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+    </script>
+</body>
+</html>
